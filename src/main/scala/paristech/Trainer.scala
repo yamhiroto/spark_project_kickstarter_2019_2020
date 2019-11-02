@@ -51,76 +51,56 @@ object Trainer {
     /** BUILDING PIPELINE **/
 
     // Load dataset
-
     val df = spark.read.load("./prepared_trainingset")
 
     //STAGE 1 - RETRIEVE WORDS (TOKEN) FROM TEXT
-
     val tokenizer = new RegexTokenizer()
       .setPattern("\\W+")
       .setGaps(true)
       .setInputCol("text")
       .setOutputCol("tokens")
 
-
     //STAGE 2 - REMOVE STOP WORDS
-
     val tokenFilter = new StopWordsRemover()
       .setInputCol("tokens")
       .setOutputCol("tokens_filtered")
 
-
     //STAGE 3 - VECTORIZE TOKEN - TF
-
     val tokenVectorizer = new CountVectorizer()
       .setInputCol("tokens_filtered")
       .setOutputCol("tokens_vectorized")
 
-
     //STAGE 4 - COMPUTE IDF
-
     val idf = new IDF()
       .setInputCol("tokens_vectorized")
       .setOutputCol("tfidf")
 
-
     //STAGE 5 - TRANSFORM country2 FROM CATEGORY VARIABLE TO NUMERICAL VARIABLE
-
     val country_indexer = new StringIndexer()
       .setInputCol("country2")
       .setOutputCol("country_indexed")
 
-
     //STAGE 6 - TRANSFORM currency2 FROM CATEGORY VARIABLE TO NUMERICAL VARIABLE
-
     val currency_indexer = new StringIndexer()
       .setInputCol("currency2")
       .setOutputCol("currency_indexed")
 
-
     //STAGE 7 - TRANSFORM country_indexed FROM NUMERICAL VARIABLE WITH A ONE-HOT ENCODING
-
     val country_encoder = new OneHotEncoder()
       .setInputCol("country_indexed")
       .setOutputCol("country_onehot")
 
-
     //STAGE 8 - TRANSFORM currency_indexed FROM NUMERICAL VARIABLE WITH A ONE-HOT ENCODING
-
     val currency_encoder = new OneHotEncoder()
       .setInputCol("currency_indexed")
       .setOutputCol("currency_onehot")
 
-
     //STAGE 9 - GATHER ALL THE FEATURES IN ONE COLUMN features
-
     val features_assembler = new VectorAssembler()
       .setInputCols(Array("tfidf", "days_campaign", "hours_prepa", "goal", "country_onehot", "currency_onehot"))
       .setOutputCol("features")
 
-
     //STAGE 10 - INSTANTIATE CLASSIFICATION MODEL (Estimator)
-
     val lr = new LogisticRegression()
       .setElasticNetParam(0.0)
       .setFitIntercept(true)
@@ -136,37 +116,29 @@ object Trainer {
     /** BUILD PIPELINE */
 
     //Create Pipeline
-
     val pipeline = new Pipeline()
       .setStages(Array(tokenizer, tokenFilter, tokenVectorizer, idf, country_indexer, currency_indexer,
         country_encoder, currency_encoder, features_assembler, lr))
 
-
     //Split data in training and test sets
-
     val Array(training, test) = df.randomSplit(Array(0.9, 0.1), 0)
 
-
     //Model training
-
     val trained_model: PipelineModel = pipeline.fit(training)
 
-    //
-    model.write.overwrite().save("./model/spark-logistic-regression-model")
+    //Save model
+    trained_model.write.overwrite().save("./model/spark-logistic-regression-model")
 
     //Test Model
-
     val dfWithSimplePredictions : DataFrame = trained_model.transform(test)
 
-
     //Display f1-score for dfWithSimplePredictions
-
-    val f1Evaluator = new MulticlassClassificationEvaluator()
+    val f1_Evaluator = new MulticlassClassificationEvaluator()
       .setMetricName("f1")
       .setLabelCol("final_status")
       .setPredictionCol("predictions")
 
-    println("f1 score : " + f1Evaluator.evaluate(dfWithSimplePredictions))
+    println("f1 score : " + f1_Evaluator.evaluate(dfWithSimplePredictions))
 
     println("Result for dfWithSimplePredictions")
     dfWithSimplePredictions.groupBy("final_status", "predictions").count.show()
@@ -175,7 +147,6 @@ object Trainer {
     /**  FEATURES TUNING  **/
 
     // GridSearch
-
     val paramGrid = new ParamGridBuilder()
       .addGrid(lr.regParam, Array(10e-8, 10e-6, 10e-4, 10e-2))
       .addGrid(tokenVectorizer.minDF, Array(55.0,75.0,95.0))
@@ -183,42 +154,31 @@ object Trainer {
 
 
     // Train-validation split using 70% as training and F1-score as evaluator
-
-    val evaluator = new MulticlassClassificationEvaluator()
-      .setLabelCol("final_status")
-      .setPredictionCol("predictions")
-      .setMetricName("f1")
-
     val trainValidationSplit = new TrainValidationSplit()
       .setEstimator(pipeline)
-      .setEvaluator(evaluator)
+      .setEvaluator(f1_Evaluator)
       .setEstimatorParamMaps(paramGrid)
       .setTrainRatio(0.7)
 
 
     // Model Training
-
     val model = trainValidationSplit.fit(training)
 
+    //Save model
+    model.write.overwrite().save("./model/spark-logistic-regression-model_with_param_tuning")
 
     // Test Model
-
     val dfWithPredictions = model.transform(test)
       .select("features", "final_status", "predictions")
 
 
     //Display f1-score for dfWithSimplePredictions
-
-    val f1_score = evaluator.evaluate(dfWithPredictions)
+    val f1_score = f1_Evaluator.evaluate(dfWithPredictions)
 
     println("f1-score on test set: " + f1_score)
-
-
-    // Display predictions
-
-    println("Result :")
+    println("Result after Parameters tuning:")
     dfWithPredictions.groupBy("final_status", "predictions").count.show()
-
+    
 
   }
 }
