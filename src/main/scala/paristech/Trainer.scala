@@ -52,7 +52,7 @@ object Trainer {
 
     // Load dataset
 
-    val df = spark.read.load("./spark_project_kickstarter_2019_2020")
+    val df = spark.read.load("./prepared_trainingset")
 
     //STAGE 1 - RETRIEVE WORDS (TOKEN) FROM TEXT
 
@@ -119,7 +119,7 @@ object Trainer {
       .setOutputCol("features")
 
 
-    //STAGE 10 - INSTANTIATE CLASSIFICATION MODEL
+    //STAGE 10 - INSTANTIATE CLASSIFICATION MODEL (Estimator)
 
     val lr = new LogisticRegression()
       .setElasticNetParam(0.0)
@@ -151,6 +151,8 @@ object Trainer {
 
     val trained_model: PipelineModel = pipeline.fit(training)
 
+    //
+    model.write.overwrite().save("./model/spark-logistic-regression-model")
 
     //Test Model
 
@@ -173,7 +175,7 @@ object Trainer {
     /**  FEATURES TUNING  **/
 
     // GridSearch
-    
+
     val paramGrid = new ParamGridBuilder()
       .addGrid(lr.regParam, Array(10e-8, 10e-6, 10e-4, 10e-2))
       .addGrid(tokenVectorizer.minDF, Array(55.0,75.0,95.0))
