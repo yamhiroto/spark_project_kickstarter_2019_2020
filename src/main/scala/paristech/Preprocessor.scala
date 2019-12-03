@@ -57,7 +57,7 @@ object Preprocessor {
       .read
       .option("header", true) // Use first line of files as header
       .option("inferSchema", "true") // to infer the data type of each column (Int, String, etc.)
-      .csv("train_clean.csv")
+      .csv("src/main/resources/train/train_clean.csv")
 
     // display number of rows and colums within the DataFrame
 
@@ -204,7 +204,7 @@ object Preprocessor {
 
     /** 5 - SAVE DATAFRAME **/
 
-    dfFinal.write.mode(SaveMode.Overwrite).parquet("./prepared_trainingset_by_HY")
+    dfFinal.write.mode(SaveMode.Overwrite).parquet("./src/main/resources/preprocessed")
 
 
   }

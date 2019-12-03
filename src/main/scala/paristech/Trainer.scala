@@ -51,7 +51,7 @@ object Trainer {
     /** BUILDING PIPELINE **/
 
     // Load dataset
-    val df = spark.read.load("./prepared_trainingset")
+    val df = spark.read.load("./src/main/resources/prepared_trainingset")
 
     //STAGE 1 - RETRIEVE WORDS (TOKEN) FROM TEXT
     val tokenizer = new RegexTokenizer()
@@ -127,7 +127,7 @@ object Trainer {
     val trained_model: PipelineModel = pipeline.fit(training)
 
     //Save model
-    trained_model.write.overwrite().save("./model/spark-logistic-regression-model")
+    trained_model.write.overwrite().save("./src/main/model/spark-logistic-regression-model")
 
     //Test Model
     val dfWithSimplePredictions : DataFrame = trained_model.transform(test)
@@ -165,7 +165,7 @@ object Trainer {
     val model = trainValidationSplit.fit(training)
 
     //Save model
-    model.write.overwrite().save("./model/spark-logistic-regression-model_with_param_tuning")
+    model.write.overwrite().save("./src/main/model/spark-logistic-regression-model_with_param_tuning")
 
     // Test Model
     val dfWithPredictions = model.transform(test)
@@ -178,7 +178,7 @@ object Trainer {
     println("f1-score on test set: " + f1_score)
     println("Result after Parameters tuning:")
     dfWithPredictions.groupBy("final_status", "predictions").count.show()
-    
+
 
   }
 }
